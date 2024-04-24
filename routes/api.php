@@ -1,8 +1,10 @@
 <?php
 
+use App\Http\Controllers\StudentController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\UserController;
+
 
 /*
 |--------------------------------------------------------------------------
@@ -24,6 +26,9 @@ Route::middleware(['auth:sanctum'])->group(function () {
     route::post('/logout', [UserController::class, 'logout']);
     route::get('/logged_user', [UserController::class, 'logged_user']);
     route::get('/change_password', [UserController::class, 'change_password']);
+
+    // Student Routes
+    route::post('add_student', [StudentController::class, 'addStudent']);
 
 });
 // Route::middleware('auth:sanctum')->get('/user', function (Request $request) {

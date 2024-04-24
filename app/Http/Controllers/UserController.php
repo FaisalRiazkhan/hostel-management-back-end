@@ -22,7 +22,7 @@ class UserController extends Controller
                 'national_id_no' => 'required', 
                 'email' => 'required|email',
                 'password' =>'required|confirmed',
-                'phone_number' => 'required|integer'
+                'phone_number' => 'required|string|regex:/^[0-9]{11}$/|min:10'
             ]);
     
             if($validateUser->fails()){
@@ -67,13 +67,14 @@ class UserController extends Controller
                 'errors' => $validateUser->errors()
             ], 401);
         }
-        $user = user::where('email', $request->email)->first();
+        $user = user::with('roles')->where('email', $request->email)->first();
         if($user && Hash::check($request->password, $user->password)){
             $token = $user->createToken($request->email)->plainTextToken;
             return response()->json([
                 'token' => $token,
                 'status' => "Success",
                 'message' => 'Login Successfully',
+                'user' => $user,
             ], 200);
         }
         return response()->json([
