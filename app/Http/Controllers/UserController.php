@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use PhpParser\Node\Stmt\TryCatch;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Spatie\Permission\Models\Role;
 use GrahamCampbell\ResultType\Success;
 use Illuminate\Support\Facades\Validator;
 
@@ -41,11 +42,26 @@ class UserController extends Controller
                 'password' => Hash::make($request->password),
                 'phone_number' => $request->phone_number,
             ]);
+            $user_role = Role::where('name', 'user')->first();
+            // dd( $user_role);
+            if($user_role){
+                // Assign the role to the new user
+                $newUser->assignRole($user_role);
+                // dd('Role assigned successfully');
+            } else {
+                // If the role does not exist, you might want to handle this case accordingly
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Role not found',
+                ], 404);
+            }
             $token = $newUser->createToken($request->email)->plainTextToken;
+            // dd($newUser);
             return response()->json([
                 'token' => $token,
                 'status' => "Success",
                 'message' => 'User Registered Successfully',
+                'user' => $newUser
             ], 200);
         } catch (\Throwable $e) {
             return response()->json([
@@ -56,31 +72,53 @@ class UserController extends Controller
     }
 
     public function login(request $request){
-        $validateUser = Validator::make($request->all(), [
+        $validator = Validator::make($request->all(), [
             'email' => 'required|email',
-            'password' =>'required',
+            'password' => 'required',
         ]);
-        if($validateUser->fails()){
+        if ($validator->fails()) {
             return response()->json([
                 'status' => false,
-                'message' => 'validation error',
-                'errors' => $validateUser->errors()
+                'message' => 'Validation error',
+                'errors' => $validator->errors()
             ], 401);
         }
-        $user = user::with('roles')->where('email', $request->email)->first();
-        if($user && Hash::check($request->password, $user->password)){
-            $token = $user->createToken($request->email)->plainTextToken;
+        // $user = user::with('roles', 'roles.permissions')->where('email', $request->email)->first();
+        $user = User::with('roles.permissions')->where('email', $request->email)->first();
+        if (!$user || !Hash::check($request->password, $user->password)) {
             return response()->json([
-                'token' => $token,
-                'status' => "Success",
-                'message' => 'Login Successfully',
-                'user' => $user,
-            ], 200);
+                'status' => 'Failed',
+                'message' => 'The provided credentials are incorrect'
+            ], 401);
         }
+    
+        $token = $user->createToken($request->email)->plainTextToken;
+    
         return response()->json([
-            'status' => "Failed",
-            'message' => 'The provided credential are incorrect',
-        ], 401);
+            'token' => $token,
+            'status' => 'Success',
+            'message' => 'Login successful',
+            'user' => $user,
+            'role' => $user->roles->pluck('name'),
+            'permissions' => $user->roles->pluck('permissions')->flatten()->pluck('name'),
+        ], 200);
+        // dd($user->toArray());
+        // if($user && Hash::check($request->password, $user->password)){
+        //     $token = $user->createToken($request->email)->plainTextToken;
+        //     return response()->json([
+        //         'token' => $token,
+        //         'status' => "Success",
+        //         'message' => 'Login Successfully',
+        //         'user' => $user,
+        //         'role' => $user->roles->pluck('name'),
+        //         // 'permission' => $user->roles->permissions->pluck('name'),
+        //         // 'roles.permission' => $user->getPermissionNames()
+        //     ], 200);
+        // }
+        // return response()->json([
+        //     'status' => "Failed",
+        //     'message' => 'The provided credentials are incorrect',
+        // ], 401);
     }
 
     public function logout(){
@@ -90,12 +128,33 @@ class UserController extends Controller
             'message' => 'Logout successfully',
         ], 200);
     }
-    public function logged_user(){
+    // public function logged_user(){
+    //     $loggedUser = auth()->user();
+    //     // dd($loggedUser->get()->toArray());
+    //     return response()->json([
+    //         'user' => $loggedUser,
+    //         'status' => "success",
+    //         'message' => 'Logged user data',
+    //     ], 200);
+    // }
+    public function logged_user() {
         $loggedUser = auth()->user();
+    
+        if (!$loggedUser) {
+            return response()->json([
+                'status' => 'Unauthorized',
+                'message' => 'You are not logged in'
+            ], 401);
+        }
+    
+        $user = User::with('roles.permissions')->where('id', $loggedUser->id)->first();
+    
         return response()->json([
-            'user' => $loggedUser,
-            'status' => "success",
+            'user' => $user,
+            'status' => 'success',
             'message' => 'Logged user data',
+            'role' => $user->roles->pluck('name'),
+            'permissions' => $user->roles->pluck('permissions')->flatten()->pluck('name'),
         ], 200);
     }
     public function change_password(request $request){

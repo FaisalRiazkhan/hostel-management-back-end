@@ -31,6 +31,6 @@ Route::middleware(['auth:sanctum'])->group(function () {
     route::post('add_student', [StudentController::class, 'addStudent']);
 
 });
-// Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
-//     return $request->user();
-// });
+Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
+    return $request->user();
+});
